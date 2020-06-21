@@ -2,6 +2,9 @@ Mypersonal remindernotes:
 
 Node can have 1 or more PODS
 Pod can have 1 or more Containers
+
+Deploy cria um Replicaset que cria Pods
+Cronjob cria um job que cria os Pods
 ----------------------------------------------------------------------------------------
 tmux - abre sessao e na mesma janela, gerencia todas as janelas
 ctrl B soltei e shift " para dividir horizontal

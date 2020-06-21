@@ -1,0 +1,398 @@
+Mypersonal remindernotes:
+
+Node can have 1 or more PODS
+Pod can have 1 or more Containers
+----------------------------------------------------------------------------------------
+tmux - abre sessao e na mesma janela, gerencia todas as janelas
+ctrl B soltei e shift " para dividir horizontal
+ctrl B soltei e shift % para dividir vertical
+ctrl B soltei e espaço para ficar trocando as possibilidades
+
+ctrl b (solta rapido as 2 teclas) aperta % --> cria aba nova
+exit nessa janela nova e sai
+
+tmux ls --> mostra as janelas
+tmux new -s [session_name]
+----------------------------------------------------------------------------------------
+
+Control+Z is used for suspending a process by sending it the signal SIGSTOP, which cannot be intercepted by the program. While Control+C is used to kill a process with the signal SIGINT, and can be intercepted by a program so it can clean its self up before exiting, or not exit at all.
+
+----------------------------------------------------------------------------------------
+
+Kubelet - Commander (node)
+http://thesecretlivesofdata.com/raft/ --> how works nodes
+----------------------------------------------------------------------------------------
+kubectl create --help | grep -A 15 Available
+vai pegar 15 linhas depois da palavra available
+
+
+jobs -- ver oq tem no background
+fg --
+
+
+kubectl port-forward pod/demo 8080:8080
+
+ip addr
+hostname -i
+
+
+--------------------------------------------------------------------------------------------------------------
+
+ 1. Initializes cluster master node:
+
+ kubeadm init --apiserver-advertise-address $(hostname -i)   
+
+
+
+ 2. Initialize cluster networking:
+
+ kubectl apply -n kube-system -f \
+    "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 |tr -d '\n')"
+
+
+ 3. (Optional) Create an nginx deployment:
+
+ kubectl apply -f https://raw.githubusercontent.com/kubernetes/website/master/content/en/examples/application/nginx-app.yaml
+
+--------------------------------------------------------------------------------------------------------------
+
+ kubectl api-resources
+--> mostra os shortnames
+
+kubectl describe pod demo
+--> info do pod
+
+Requests é a quantidade de recursos necessária para fazer o schedule do pod
+Schedule - onde que o POD vai cair. (Sempre cai no node01 no exemplo) - Reagendamento de onde o pod vai ser Hosperdado/Node ??
+
+Request --> quem ve é o scheduler
+Limit --> quem ve é o kubelet (capitao)
+
+Environment seria a nvel Container/Aplicacao. Tipo assim: "Apicacao, pega o environemtn 'memlimit' e limita isso pra vc aplicacao"
+
+Kubectl get pods --all-namespaces -o wide
+kubectl get pods --all-namespaces output=wide
+
+kubectl get cm demo-literal -o yaml
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo
+spec:
+  containers:
+  - name: demo
+    image: wfsilva/demoapp:v2
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: envvars
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    env:
+    - name: CURSO
+      value: "K8s na veia"
+    - name: CHAVE
+      value: "Valor"
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: envvars-resources
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    resources:
+      requests:
+        memory: "16M" # 1 Megabyte = 1.000.000 bytes 
+        cpu: "500m" # = 0.5 (AWS vCPU, GCP Core, Azure Core, Hyperthread)
+      limits:
+        memory: "32Mi" # 1 Mebibyte = 1.048.576 bytes 
+        cpu: "1.5" # = 1500m (AWS vCPU, GCP Core, Azure Core, Hyperthread)
+    env:
+    - name: CPUREQUEST
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: requests.cpu
+    - name: CPULIMIT
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: limits.cpu
+    - name: MEMREQUEST
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: requests.memory
+    - name: MEMLIMIT
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: limits.memory
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: envvars-field
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    env:
+    - name: PODNAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+
+
+kubectl create configmap demo-literal \
+--from-literal=curso=k8s \
+--from-literal=chave=valor
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cm-literal
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    envFrom:
+    - configMapRef:
+        name: demo-literal
+    env:
+      - name: variavel-um
+        valueFrom:
+          configMapKeyRef:
+            name: demo-literal
+            key: curso
+      - name: variavel-dois
+        valueFrom:
+          configMapKeyRef:
+            name: demo-literal
+            key: chave
+
+--> usando demo-literal nesse YAML de cima
+
+kubectl exec -it cm-literal -- printenv
+
+kubectl describe cm demo-file
+--> 
+Name:         demo-file
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+exemplo-cm.txt:
+----
+yabadabadoookubectl get pods!
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cm-file
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    volumeMounts:
+      - name: exemplo
+        subPath: exemplo-cm.txt
+        mountPath: /exemplo-cm.txt
+  volumes:
+    - name: exemplo
+      configMap:
+        name: demo-file
+
+kubectl create secret generic --from-literal
+a saida vai pra um base64
+
+$ echo -n 'admin' | base64
+$ echo -n '1f2d1e2e67df' | base64
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: poryaml
+type: Opaque
+data:
+  username: YWRtaW4=
+  password: MWYyZDFlMmU2N2Rm
+
+kubectl describe secrets poryaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-env
+spec:
+  containers:
+  - name: demo
+    image: alpine
+    command: ["sleep","600"]
+    envFrom:
+    - secretRef:
+        name: cli-literal
+    env:
+      - name: usuario-file
+        valueFrom:
+          secretKeyRef:
+            name: cli-file
+            key: user.txt
+      - name: senha-file
+        valueFrom:
+          secretKeyRef:
+            name: cli-file
+            key: pass.txt
+
+kubectl exec -ti secret-env printenv
+
+apiVersion: v1
+kind: Pod
+metadata:
+name: outrademo
+labels:
+chave: valor
+spec:
+containers:
+- name: web
+image: wfsilva/demoapp:v1
+ports:
+- containerPort: 8080
+nodeName: k8snode2
+
+apiVersion: v1
+kind: Pod
+metadata:
+name: outrademo
+labels:
+chave: valor
+spec:
+containers:
+- name: web
+image: wfsilva/demoapp:v1
+ports:
+- containerPort: 8080
+nodeSelector:
+disktype: ssd
+
+--> usando LABEL
+kubectl get po --show-labels
+kubectl get node --show-labels
+watch -n 1 kubectl get pod,no --show-labels
+
+apiVersion: v1
+kind: Binding
+metadata:
+name: outrademo
+target:
+apiVersion: v1
+Kind: node
+name: k8snode1
+
+ curl \
+--header "Content-Type:application/json" \
+--header "Authorization: Bearer <TOKEN>" \
+--cacert <path/to/ca.crt> \
+--request POST \
+--data '{"apiVersion":"v1"
+,
+"kind":"Binding"
+,
+"metadata": ...}' \
+https://k8smaster/api/v1/namespaces/default/pods/<podname>/binding
+
+
+Vem da relação de spray de tinta mas parece mais com o spray do repelente.
+Fazendo um paralelo, os pods não são agendados (scheduled) nos nós que tenham tinta
+(taint). A não ser que explicitamente tenham tolerância à tinta (tolerant)
+
+kubectl taint nodes k8snode2 doenca=dengue:NoSchedule
+kubectl taint node k8snode2 doenca=dengue:NoExecute
+
+apiVersion: v1
+kind: Pod
+metadata:
+name: demo
+spec:
+containers:
+- name: web
+image: wfsilva/demoapp:v1
+tolerations:
+- key: "doenca"
+operator: "Equal"
+value: "dengue"
+effect: "NoExecute
+
+kubectl describe node k8smaster | grep Taint
+Taints: node-role.kubernetes.io/master:NoSchedule
+$ kubectl describe node k8snode2 | grep Taint
+Taints: doenca=dengue:NoExecute
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+labels:
+app: store
+spec:
+affinity:
+podAntiAffinity:
+requiredDuringSchedulingIgnoredDuringExecution:
+- labelSelector:
+matchExpressions:
+- key: app
+operator: In
+values:
+- store
+topologyKey: "kubernetes.io/hostname"
+
+kubectl descrive nodes k8smarter 'pipe' grep Taint
+kubectl descrive nodes k8no1 'pipe' grep Taint
+kubectl descrive nodes k8no2 'pipe' grep Taint
+kubectl descrive nodes k8no3 'pipe' grep Taint
+
+Para remover tain
+
+Kubectl taint node k8snode2 doenca-
+
+
+apiVersion: v1
+...
+spec:
+containers:
+- name: demoapp
+image: wfsilva/demoapp:v2
+affinity:
+nodeAffinity:
+requiredDuringSchedulingIgnoredDuringExecution:
+nodeSelectorTerms:
+- matchExpressions:
+- key: kubernetes.io/e2e-az-name
+operator: In
+values:
+- e2e-az1
+- e2e-az2
